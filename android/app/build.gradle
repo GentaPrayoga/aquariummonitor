@@ -1,0 +1,90 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+android {
+    namespace "com.aquarium.monitor"
+    compileSdk 34
+    ndkVersion flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        applicationId "com.aquarium.monitor"
+        
+        // Minimum SDK untuk MQTT dan Modern Features
+        minSdkVersion flutter.minSdkVersion
+        targetSdkVersion 33
+        
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        
+        // MultiDex support untuk dependencies yang banyak
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            // Signing config untuk release
+            signingConfig signingConfigs.debug
+            
+            // Minifikasi dan Obfuscation
+            minifyEnabled true
+            shrinkResources true
+            
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        
+        debug {
+            // Debug config
+            applicationIdSuffix ".debug"
+            debuggable true
+        }
+    }
+    
+    // Lint options
+    lintOptions {
+        disable 'InvalidPackage'
+        checkReleaseBuilds false
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    // MultiDex support
+    implementation 'androidx.multidex:multidex:2.0.1'
+}
