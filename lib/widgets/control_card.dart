@@ -4,14 +4,18 @@ class ControlCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final bool isActive;
+  final String? mode; // AUTO, ON, OFF
   final VoidCallback onToggle;
+  final Function(String)? onModeChange;
 
   const ControlCard({
     super.key,
     required this.title,
     required this.icon,
     required this.isActive,
+    this.mode,
     required this.onToggle,
+    this.onModeChange,
   });
 
   @override
@@ -96,18 +100,114 @@ class ControlCard extends StatelessWidget {
               ),
             ),
             
-            // Toggle Switch
-            Transform.scale(
-              scale: 1.1,
-              child: Switch(
-                value: isActive,
-                onChanged: (_) => onToggle(),
-                activeColor: Theme.of(context).colorScheme.primary,
+            // Mode Selector or Toggle Switch
+            if (mode != null && onModeChange != null)
+              _buildModeSelector(context)
+            else
+              Transform.scale(
+                scale: 1.1,
+                child: Switch(
+                  value: isActive,
+                  onChanged: (_) => onToggle(),
+                  activeColor: Theme.of(context).colorScheme.primary,
+                ),
               ),
-            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildModeSelector(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: _getModeColor(mode!).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _getModeColor(mode!)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              mode!,
+              style: TextStyle(
+                color: _getModeColor(mode!),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              color: _getModeColor(mode!),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+      onSelected: onModeChange,
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'AUTO',
+          child: Row(
+            children: [
+              Icon(Icons.autorenew, color: Colors.blue, size: 20),
+              const SizedBox(width: 8),
+              const Text('AUTO'),
+              if (mode == 'AUTO')
+                const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: Icon(Icons.check, size: 16),
+                ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'ON',
+          child: Row(
+            children: [
+              Icon(Icons.power_settings_new, color: Colors.green, size: 20),
+              const SizedBox(width: 8),
+              const Text('ON'),
+              if (mode == 'ON')
+                const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: Icon(Icons.check, size: 16),
+                ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'OFF',
+          child: Row(
+            children: [
+              Icon(Icons.power_off, color: Colors.red, size: 20),
+              const SizedBox(width: 8),
+              const Text('OFF'),
+              if (mode == 'OFF')
+                const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: Icon(Icons.check, size: 16),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getModeColor(String mode) {
+    switch (mode) {
+      case 'AUTO':
+        return Colors.blue;
+      case 'ON':
+        return Colors.green;
+      case 'OFF':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
   }
 }

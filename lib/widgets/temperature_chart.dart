@@ -32,16 +32,14 @@ class TemperatureChart extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildLegend(context, 'Temp 1', Colors.blue),
-                  const SizedBox(width: 20),
-                  _buildLegend(context, 'Temp 2', Colors.red),
+                  _buildLegend(context, 'Water Temperature', Colors.blue),
                 ],
               ),
               const SizedBox(height: 16),
               
               // Chart
               Expanded(
-                child: mqtt.temp1History.isEmpty && mqtt.temp2History.isEmpty
+                child: mqtt.temperatureHistory.isEmpty
                     ? Center(
                         child: Text(
                           'Waiting for data...',
@@ -110,10 +108,10 @@ class TemperatureChart extends StatelessWidget {
             reservedSize: 30,
             interval: 5,
             getTitlesWidget: (value, meta) {
-              if (value.toInt() >= mqtt.temp1History.length) {
+              if (value.toInt() >= mqtt.temperatureHistory.length) {
                 return const Text('');
               }
-              final time = mqtt.temp1History[value.toInt()].time;
+              final time = mqtt.temperatureHistory[value.toInt()].time;
               return Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
@@ -151,20 +149,20 @@ class TemperatureChart extends StatelessWidget {
         ),
       ),
       minX: 0,
-      maxX: mqtt.temp1History.length > 0 
-          ? mqtt.temp1History.length.toDouble() - 1 
+      maxX: mqtt.temperatureHistory.length > 0 
+          ? mqtt.temperatureHistory.length.toDouble() - 1 
           : 10,
       minY: 20,
-      maxY: 32,
+      maxY: 35,
       lineBarsData: [
-        // Temperature 1
-        if (mqtt.temp1History.isNotEmpty)
+        // Water Temperature
+        if (mqtt.temperatureHistory.isNotEmpty)
           LineChartBarData(
             spots: List.generate(
-              mqtt.temp1History.length,
+              mqtt.temperatureHistory.length,
               (index) => FlSpot(
                 index.toDouble(),
-                mqtt.temp1History[index].value,
+                mqtt.temperatureHistory[index].value,
               ),
             ),
             isCurved: true,
@@ -175,27 +173,6 @@ class TemperatureChart extends StatelessWidget {
             belowBarData: BarAreaData(
               show: true,
               color: Colors.blue.withOpacity(0.1),
-            ),
-          ),
-        
-        // Temperature 2
-        if (mqtt.temp2History.isNotEmpty)
-          LineChartBarData(
-            spots: List.generate(
-              mqtt.temp2History.length,
-              (index) => FlSpot(
-                index.toDouble(),
-                mqtt.temp2History[index].value,
-              ),
-            ),
-            isCurved: true,
-            color: Colors.red,
-            barWidth: 3,
-            isStrokeCapRound: true,
-            dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(
-              show: true,
-              color: Colors.red.withOpacity(0.1),
             ),
           ),
       ],

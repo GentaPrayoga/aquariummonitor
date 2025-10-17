@@ -1,4 +1,4 @@
-package com.example.aquarium.monitor
+package com.aquarium.monitor
 
 import io.flutter.embedding.android.FlutterActivity
 

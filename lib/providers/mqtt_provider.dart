@@ -12,32 +12,29 @@ class MqttProvider extends ChangeNotifier {
   bool _isConnected = false;
   bool get isConnected => _isConnected;
   
-  // Sensor Data
-  double _temp1 = 0.0;
-  double _temp2 = 0.0;
-  double _waterLevel = 0.0;
-  int _turbidity = 0;
+  // Sensor Data - dengan default values untuk demo
+  double _temperature = 28.5;
+  double _turbidityNTU = 150.0; // Dalam NTU (Nephelometric Turbidity Units)
+  double _tempOffset = 0.0; // Offset kalibrasi suhu
   
-  double get temp1 => _temp1;
-  double get temp2 => _temp2;
-  double get waterLevel => _waterLevel;
-  int get turbidity => _turbidity;
+  double get temperature => _temperature;
+  double get turbidityNTU => _turbidityNTU;
+  double get tempOffset => _tempOffset;
   
   // Device Status
-  bool _pump1Status = false;
-  bool _pump2Status = false;
   bool _heaterStatus = false;
+  String _heaterMode = 'AUTO'; // AUTO, ON, OFF
   
-  bool get pump1Status => _pump1Status;
-  bool get pump2Status => _pump2Status;
   bool get heaterStatus => _heaterStatus;
+  String get heaterMode => _heaterMode;
   
-  // History Data (untuk chart)
-  List<ChartData> _temp1History = [];
-  List<ChartData> _temp2History = [];
+  // History Data (untuk chart) - dengan demo data
+  List<ChartData> _temperatureHistory = [];
   
-  List<ChartData> get temp1History => _temp1History;
-  List<ChartData> get temp2History => _temp2History;
+  List<ChartData> get temperatureHistory => _temperatureHistory;
+  
+  // Timer untuk demo data
+  Timer? _demoTimer;
   
   // Error message
   String _errorMessage = '';
@@ -49,9 +46,58 @@ class MqttProvider extends ChangeNotifier {
   final String _clientId = 'FlutterAquarium_${DateTime.now().millisecondsSinceEpoch}';
   
   MqttProvider() {
+    // Inisialisasi dengan demo data
+    _initializeDemoData();
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeMqtt();
     });
+  }
+  
+  // Initialize demo data untuk tampilan awal
+  void _initializeDemoData() {
+    // Tambahkan beberapa data point untuk chart
+    final now = DateTime.now();
+    for (int i = 0; i < 10; i++) {
+      _temperatureHistory.add(
+        ChartData(
+          now.subtract(Duration(seconds: (10 - i) * 5)),
+          27.5 + (i % 3) * 0.5, // Variasi demo data
+        ),
+      );
+    }
+    
+    // Mulai timer untuk update demo data jika tidak terkoneksi
+    _demoTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!_isConnected) {
+        _updateDemoData();
+      }
+    });
+  }
+  
+  // Update demo data secara periodik
+  void _updateDemoData() {
+    // Simulasi perubahan suhu
+    _temperature = 27.5 + (DateTime.now().second % 5) * 0.3;
+    
+    // Simulasi perubahan turbidity dalam NTU (0-3000 NTU)
+    _turbidityNTU = 100.0 + (DateTime.now().second % 20) * 10.0;
+    
+    // Simulasi AUTO mode untuk heater
+    if (_heaterMode == 'AUTO') {
+      if (_temperature < 27.0 && !_heaterStatus) {
+        _heaterStatus = true;
+        debugPrint('🔥 Demo: Heater ON (temp < 27°C)');
+      } else if (_temperature > 30.0 && _heaterStatus) {
+        _heaterStatus = false;
+        debugPrint('❄️ Demo: Heater OFF (temp > 30°C)');
+      }
+    }
+    
+    // Update history
+    _addToHistory(_temperatureHistory, _temperature);
+    
+    notifyListeners();
   }
   
   // Initialize MQTT Client
@@ -100,13 +146,10 @@ class MqttProvider extends ChangeNotifier {
     _errorMessage = '';
     
     // Subscribe to topics
-    _client.subscribe('aquarium/temp1', MqttQos.atLeastOnce);
-    _client.subscribe('aquarium/temp2', MqttQos.atLeastOnce);
-    _client.subscribe('aquarium/waterlevel', MqttQos.atLeastOnce);
-    _client.subscribe('aquarium/turbidity', MqttQos.atLeastOnce);
-    _client.subscribe('aquarium/pump1/status', MqttQos.atLeastOnce);
-    _client.subscribe('aquarium/pump2/status', MqttQos.atLeastOnce);
-    _client.subscribe('aquarium/heater/status', MqttQos.atLeastOnce);
+    _client.subscribe('heater/temperature', MqttQos.atLeastOnce);
+    _client.subscribe('heater/turbidity', MqttQos.atLeastOnce);
+    _client.subscribe('heater/status', MqttQos.atLeastOnce);
+    _client.subscribe('heater/calibrate', MqttQos.atLeastOnce);
     
     // Listen to messages
     _client.updates!.listen(_onMessage);
@@ -133,28 +176,28 @@ class MqttProvider extends ChangeNotifier {
     
     // Parse sensor data
     switch (topic) {
-      case 'aquarium/temp1':
-        _temp1 = double.tryParse(message.trim()) ?? 0.0;
-        _addToHistory(_temp1History, _temp1);
+      case 'heater/temperature':
+        _temperature = double.tryParse(message.trim()) ?? 0.0;
+        _addToHistory(_temperatureHistory, _temperature);
         break;
-      case 'aquarium/temp2':
-        _temp2 = double.tryParse(message.trim()) ?? 0.0;
-        _addToHistory(_temp2History, _temp2);
+      case 'heater/turbidity':
+        // Turbidity dalam NTU dari ESP32
+        _turbidityNTU = double.tryParse(message.trim()) ?? 0.0;
         break;
-      case 'aquarium/waterlevel':
-        _waterLevel = double.tryParse(message.trim()) ?? 0.0;
+      case 'heater/status':
+        final status = message.trim();
+        if (status == 'ON' || status == 'OFF') {
+          _heaterStatus = status == 'ON';
+          _heaterMode = _heaterStatus ? 'MANUAL' : 'MANUAL';
+        } else if (status == 'AUTO' || status == 'connected') {
+          _heaterMode = 'AUTO';
+        }
         break;
-      case 'aquarium/turbidity':
-        _turbidity = int.tryParse(message.trim()) ?? 0;
-        break;
-      case 'aquarium/pump1/status':
-        _pump1Status = message.trim() == 'ON';
-        break;
-      case 'aquarium/pump2/status':
-        _pump2Status = message.trim() == 'ON';
-        break;
-      case 'aquarium/heater/status':
-        _heaterStatus = message.trim() == 'ON';
+      case 'heater/calibrate':
+        // Response kalibrasi dari ESP32
+        if (message.startsWith('OK:')) {
+          debugPrint('✅ Calibration response: $message');
+        }
         break;
     }
     
@@ -170,19 +213,58 @@ class MqttProvider extends ChangeNotifier {
   }
   
   // Control devices
-  void togglePump1() {
-    final message = _pump1Status ? 'OFF' : 'ON';
-    _publishMessage('aquarium/pump1/control', message);
-  }
-  
-  void togglePump2() {
-    final message = _pump2Status ? 'OFF' : 'ON';
-    _publishMessage('aquarium/pump2/control', message);
+  void setHeaterMode(String mode) {
+    // mode: 'ON', 'OFF', 'AUTO'
+    _heaterMode = mode;
+    
+    if (_isConnected) {
+      // Kirim ke ESP32 jika terkoneksi
+      _publishMessage('heater/control', mode);
+    } else {
+      // Mode demo: update local state saja
+      debugPrint('📝 Demo mode: Heater mode set to $mode (not connected to MQTT)');
+    }
+    
+    if (mode == 'AUTO') {
+      // Dalam mode AUTO, status heater dikontrol oleh ESP32 atau simulasi
+      if (!_isConnected) {
+        // Simulasi AUTO mode: nyalakan jika suhu < 27, matikan jika > 30
+        _heaterStatus = _temperature < 27.0;
+      }
+    } else {
+      _heaterStatus = mode == 'ON';
+    }
+    
+    notifyListeners();
   }
   
   void toggleHeater() {
     final message = _heaterStatus ? 'OFF' : 'ON';
-    _publishMessage('aquarium/heater/control', message);
+    setHeaterMode(message);
+  }
+  
+  // Kalibrasi suhu
+  void calibrateTemperature(double referenceTemp) {
+    if (_isConnected) {
+      // Format: CAL:25.5
+      final message = 'CAL:$referenceTemp';
+      _publishMessage('heater/calibrate', message);
+      debugPrint('📡 Sending calibration: $message');
+    } else {
+      debugPrint('⚠️ Cannot calibrate: Not connected to MQTT');
+    }
+  }
+  
+  // Reset kalibrasi
+  void resetCalibration() {
+    if (_isConnected) {
+      _publishMessage('heater/calibrate', 'RESET');
+      _tempOffset = 0.0;
+      debugPrint('🔄 Reset calibration');
+      notifyListeners();
+    } else {
+      debugPrint('⚠️ Cannot reset: Not connected to MQTT');
+    }
   }
   
   void _publishMessage(String topic, String message) {
@@ -209,7 +291,10 @@ class MqttProvider extends ChangeNotifier {
   
   @override
   void dispose() {
-    _client.disconnect();
+    _demoTimer?.cancel();
+    if (_isConnected) {
+      _client.disconnect();
+    }
     super.dispose();
   }
 }
